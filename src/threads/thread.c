@@ -658,6 +658,27 @@ void refresh_priority(void) {
   }
 }
 
+/* 2. priority donation_현재 스레드가 다른 스레드에게 우선순위를 기부 */
+void donate_priority(void) {
+  struct thread *curr = thread_current();//curr: 현재 실행 중인 스레드
+  struct lock *lock = curr->wait_on_lock;//wait_on_lock: 현재 스레드가 기다리고 있는 락
+  int depth = 0;//depth:무한루프 방지
+
+  while (lock && depth < 8) {
+    struct thread *holder = lock->holder;
+    if (holder == NULL) break; //현재 락을 잡고 있는 holder가 없으면 stop
+
+    if (holder->priority < curr->priority) { 
+      holder->priority = curr->priority; //holder의 우선순위가 현재보다 낮으면 우선순위를 기부(donate)
+      list_insert_ordered(&holder->donations, &curr->donation_elem, compare_priority, NULL);
+    }
+
+    curr = holder;
+    lock = curr->wait_on_lock; //다음 단계의 donation- curr과 lock을 갱신하고 깊이를 증가
+    depth++;
+  }
+}
+
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
