@@ -102,6 +102,12 @@ struct thread
     unsigned magic;                     /* Detects stack overflow. */
     int64_t wake_up_time;                /*스레드 언제 깨울지*/
 
+   /* Add to struct thread */
+   int init_priority;                     /* 원래의 priority 저장용 */
+   struct lock *wait_on_lock;             /* 현재 기다리고 있는 lock */
+   struct list donations;                /* priority를 기부한 thread 리스트 */
+   struct list_elem donation_elem;       /* 리스트 안에 들어갈 때 쓰는 요소 */
+
    };
 
 /* If false (default), use round-robin scheduler.
