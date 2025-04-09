@@ -380,7 +380,17 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  /*thread_current ()->priority = new_priority; init_priority 바꾸기, 높은 priority가 낮아지지 않도록 수정
+*/
+struct thread *curr = thread_current ();
+  int old_priority = curr->priority;
+
+  curr->init_priority = new_priority;  // 초기 우선순위 업데이트
+  refresh_priority();                  // 현재 priority 갱신
+
+  // 우선순위가 낮아졌고, 더 높은 priority의 스레드가 ready_list에 있으면 양보
+  if (curr->priority < old_priority)
+    thread_yield();
 }
 
 /* Returns the current thread's priority. */
@@ -633,6 +643,21 @@ allocate_tid (void)
 
   return tid;
 }
+/* 2. 현재 스레드의 우선순위를 갱신하는 refresh 함수-init or donation lsit */
+void refresh_priority(void) {
+  struct thread *curr = thread_current ();
+  curr->priority = curr->init_priority;  // 기본 우선순위로 initialization
+
+  if (!list_empty(&curr->donations)) {
+    // donation 리스트에서 가장 높은 priority 가진 스레드 찾기
+    list_sort(&curr->donations, compare_priority, NULL);
+    struct thread *highest = list_entry(list_front(&curr->donations), struct thread, donation_elem);
+
+    if (highest->priority > curr->priority)
+      curr->priority = highest->priority;
+  }
+}
+
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
