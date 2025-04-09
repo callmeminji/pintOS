@@ -211,7 +211,11 @@ thread_create (const char *name, int priority,
   intr_set_level (old_level);
 
   /* Add to run queue. */
-  thread_unblock (t);
+  thread_unblock (t); //thread를 ready_list에 그냥 넣어줌
+
+  // 2. 수정) add) 현재 실행 중인 스레드보다 새로 만든 스레드의 priority가 높다면 양보
+  if (thread_current()->priority < t->priority)
+    thread_yield(); //thread_yield로 cpu 양보
 
   return tid;
 }
