@@ -389,8 +389,15 @@ struct thread *curr = thread_current ();
   refresh_priority();                  // 현재 priority 갱신
 
   // 우선순위가 낮아졌고, 더 높은 priority의 스레드가 ready_list에 있으면 양보
-  if (curr->priority < old_priority)
-    thread_yield();
+  /*if (curr->priority < old_priority)
+    thread_yield();*/
+    //ready_list !=empty, 현재 스레드보다 priority 높은 스레드 O - yield
+     if (!list_empty(&ready_list)) {
+    struct thread *highest = list_entry(list_front(&ready_list), struct thread, elem);
+    if (curr->priority < highest->priority)
+      thread_yield();
+  } 
+
 }
 
 /* Returns the current thread's priority. */
@@ -671,7 +678,7 @@ void donate_priority(void) {
     if (holder->priority < curr->priority) { 
       holder->priority = curr->priority; //holder의 우선순위가 현재보다 낮으면 우선순위를 기부(donate)
       list_insert_ordered(&holder->donations, &curr->donation_elem, compare_priority, NULL);
-    }
+    }gkfkrh
 
     curr = holder;
     lock = curr->wait_on_lock; //다음 단계의 donation- curr과 lock을 갱신하고 깊이를 증가
