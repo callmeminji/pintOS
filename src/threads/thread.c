@@ -502,6 +502,10 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  /* 2. 기존 우선순위 저장, donation후 복구-수정 */
+  t->init_priority = priority;          // 초기 우선순위 저장
+  list_init(&t->donations);             // donations 리스트 초기화
+  t->wait_on_lock = NULL;              // 기다리는 락 없음
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
 }
