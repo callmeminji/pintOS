@@ -602,6 +602,17 @@ schedule (void)
   thread_schedule_tail (prev);
 }
 
+/* 2. 두 스레드의 우선순위를 비교하는 함수.
+   a의 우선순위가 더 높으면 true를 반환함. */
+bool compare_priority(const struct list_elem *a,
+                      const struct list_elem *b,
+                      void *aux UNUSED) {
+    const struct thread *t_a = list_entry(a, struct thread, elem);
+    const struct thread *t_b = list_entry(b, struct thread, elem);
+    return t_a->priority > t_b->priority;
+}
+
+
 /* Returns a tid to use for a new thread. */
 static tid_t
 allocate_tid (void) 
