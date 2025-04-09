@@ -322,7 +322,8 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+  /* 2.list_push_back (&ready_list, &cur->elem); -> push_back()은 무조건 뒤에 들어감*/
+    list_insert_ordered (&ready_list, &cur->elem, compare_priority, NULL);  // 우선순위 높은 스레드가 먼저 실행되게함
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
