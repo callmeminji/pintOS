@@ -244,8 +244,27 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
+  remove_with_lock(lock); //2. add1. 현재 lock기다리는 thread들에게 받은 donation중 해당 lock과 관련된 것 제거
+  refresh_priority();//2. add2. priority 복원/남은 donation 중 최고값 유지
+
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+}
+
+/* 2. add remove_with_lock()- 특정 락과 관련된 donation을 제거 */
+void
+remove_with_lock(struct lock *lock) {
+  struct thread *curr = thread_current();
+  struct list_elem *e = list_begin(&curr->donations);
+
+  while (e != list_end(&curr->donations)) {
+    struct thread *t = list_entry(e, struct thread, donation_elem);
+    if (t->wait_on_lock == lock) {
+      e = list_remove(e);  // 해당 donation 제거
+    } else {
+      e = list_next(e);
+    }
+  }
 }
 
 /* Returns true if the current thread holds LOCK, false
