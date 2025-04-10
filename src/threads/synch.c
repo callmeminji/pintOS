@@ -115,7 +115,8 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
+  if (!list_empty (&sema->waiters)) //fifo
+  list_sort(&sema->waiters, compare_priority, NULL); // 2. add1. 정렬 먼저
     thread_unblock (list_entry (list_pop_front (&sema->waiters),
                                 struct thread, elem));
   sema->value++;
