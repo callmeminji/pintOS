@@ -145,5 +145,15 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+/*error 4. compare_priority 함수 원형 선언*/
+bool compare_priority(const struct list_elem *a,
+                      const struct list_elem *b,
+                      void *aux);
+/* error 5. 함수 선언 추가*/                      
+void donate_priority(void);
+void refresh_priority(void);
+void remove_with_lock(struct lock *lock);
+
+
 
 #endif /* threads/thread.h */
