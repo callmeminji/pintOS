@@ -87,6 +87,10 @@ static tid_t allocate_tid (void);
 
    It is not safe to call thread_current() until this function
    finishes. */
+/* error1. compare_priority 선언 추가 */
+bool compare_priority(const struct list_elem *a,
+                      const struct list_elem *b,
+                      void *aux UNUSED); 
 void
 thread_init (void) 
 {
