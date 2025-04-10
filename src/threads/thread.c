@@ -689,7 +689,11 @@ void donate_priority(void) {
 
     if (holder->priority < curr->priority) { 
       holder->priority = curr->priority; //holder의 우선순위가 현재보다 낮으면 우선순위를 기부(donate)
+      
+       list_remove(&curr->donation_elem);// 중복 donation 제거
       list_insert_ordered(&holder->donations, &curr->donation_elem, compare_priority, NULL);
+
+    
     }
 
     curr = holder;
