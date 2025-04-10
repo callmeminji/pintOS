@@ -690,7 +690,7 @@ void donate_priority(void) {
     if (holder->priority < curr->priority) { 
       holder->priority = curr->priority; //holder의 우선순위가 현재보다 낮으면 우선순위를 기부(donate)
       list_insert_ordered(&holder->donations, &curr->donation_elem, compare_priority, NULL);
-    }gkfkrh
+    }
 
     curr = holder;
     lock = curr->wait_on_lock; //다음 단계의 donation- curr과 lock을 갱신하고 깊이를 증가
