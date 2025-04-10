@@ -68,7 +68,9 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_push_back (&sema->waiters, &thread_current ()->elem);
+      /*list_push_back (&sema->waiters, &thread_current ()->elem); pushvack은 fifo*/
+      /*2. add1. priority 기준 ordered 삽입*/
+      list_insert_ordered (&sema->waiters, &thread_current()->elem, compare_priority, NULL);
       thread_block ();
     }
   sema->value--;
