@@ -662,43 +662,47 @@ allocate_tid (void)
 
   return tid;
 }
-/* 2. 현재 스레드의 우선순위를 갱신하는 refresh 함수-init or donation lsit */
-void refresh_priority(void) {
-  struct thread *curr = thread_current ();
-  curr->priority = curr->init_priority;  // 기본 우선순위로 initialization
-
-  if (!list_empty(&curr->donations)) {
-    // donation 리스트에서 가장 높은 priority 가진 스레드 찾기
-    list_sort(&curr->donations, compare_priority, NULL);
-    struct thread *highest = list_entry(list_front(&curr->donations), struct thread, donation_elem);
-
-    if (highest->priority > curr->priority)
-      curr->priority = highest->priority;
-  }
-}
-
 /* 2. priority donation_현재 스레드가 다른 스레드에게 우선순위를 기부 */
 void donate_priority(void) {
-  struct thread *curr = thread_current();//curr: 현재 실행 중인 스레드
-  struct lock *lock = curr->wait_on_lock;//wait_on_lock: 현재 스레드가 기다리고 있는 락
-  int depth = 0;//depth:무한루프 방지
+  struct thread *curr = thread_current();           // curr: 현재 실행 중인 스레드
+  struct lock *lock = curr->wait_on_lock;           // wait_on_lock: 현재 스레드가 기다리고 있는 락
+  int depth = 0;                                     // depth: 무한루프 방지
 
   while (lock && depth < 8) {
     struct thread *holder = lock->holder;
-    if (holder == NULL) break; //현재 락을 잡고 있는 holder가 없으면 stop
+    if (holder == NULL) break;                      // 현재 락을 잡고 있는 holder가 없으면 stop
 
-    if (holder->priority < curr->priority) { 
-      holder->priority = curr->priority; //holder의 우선순위가 현재보다 낮으면 우선순위를 기부(donate)
-      
-       list_remove(&curr->donation_elem);// 중복 donation 제거
+    if (holder->priority < curr->priority) {
+
+      // 중복 donation 제거: donation_elem이 holder의 donations 리스트에 있는 경우만 제거
+      struct list_elem *e;
+      for (e = list_begin(&holder->donations); e != list_end(&holder->donations); e = list_next(e)) {
+        struct thread *t = list_entry(e, struct thread, donation_elem);
+        if (t == curr) {
+          list_remove(&curr->donation_elem);        // 중복 donation 제거
+          break;
+        }
+      }
+
       list_insert_ordered(&holder->donations, &curr->donation_elem, compare_priority, NULL);
-
-    
+      holder->priority = curr->priority;            // holder의 우선순위가 현재보다 낮으면 우선순위를 기부(donate)
     }
 
     curr = holder;
-    lock = curr->wait_on_lock; //다음 단계의 donation- curr과 lock을 갱신하고 깊이를 증가
+    lock = curr->wait_on_lock;                      // 다음 단계의 donation - curr과 lock을 갱신하고 깊이를 증가
     depth++;
+  }
+}
+
+/* 2. priority restore_현재 스레드의 priority를 기부받기 전으로 복원 */
+void refresh_priority(void) {
+  struct thread *curr = thread_current();
+  curr->priority = curr->init_priority;
+
+  if (!list_empty(&curr->donations)) {
+    struct thread *donor = list_entry(list_front(&curr->donations), struct thread, donation_elem);
+    if (donor->priority > curr->priority)
+      curr->priority = donor->priority;
   }
 }
 
