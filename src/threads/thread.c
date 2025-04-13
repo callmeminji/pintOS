@@ -80,6 +80,11 @@ bool compare_priority(const struct list_elem *a,
                       void *aux UNUSED); 
 /* error2. refresh_priority 선언 추가*/
 void refresh_priority(void);
+/* error3. compare_donation_priority 선언 추가*/
+bool compare_donation_priority(const struct list_elem *a,
+                               const struct list_elem *b,
+                               void *aux UNUSED);
+
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -700,11 +705,24 @@ void refresh_priority(void) {
   curr->priority = curr->init_priority;
 
   if (!list_empty(&curr->donations)) {
-    struct thread *donor = list_entry(list_front(&curr->donations), struct thread, donation_elem);
-    if (donor->priority > curr->priority)
-      curr->priority = donor->priority;
+    struct thread *max_donor = list_entry(
+      list_max(&curr->donations, compare_donation_priority, NULL),
+      struct thread, donation_elem);
+
+    if (max_donor->priority > curr->priority)
+      curr->priority = max_donor->priority;
   }
 }
+
+/* donation_elem을 기준으로 우선순위 비교 */
+bool compare_donation_priority(const struct list_elem *a,
+                               const struct list_elem *b,
+                               void *aux UNUSED) {
+  const struct thread *t_a = list_entry(a, struct thread, donation_elem);
+  const struct thread *t_b = list_entry(b, struct thread, donation_elem);
+  return t_a->priority > t_b->priority;
+}
+
 
 
 /* Offset of `stack' member within `struct thread'.
