@@ -20,6 +20,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+static void argument_stack(char **argv, int argc, void **esp);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -31,18 +32,38 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
 
-  /* Make a copy of FILE_NAME.
-     Otherwise there's a race between the caller and load(). */
-  fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
-    return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
+  char *file_name_copy1, *file_name_copy2;
+  char *token, *save_ptr;
 
-  /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  // Allocate pages for two copies
+  file_name_copy1 = palloc_get_page(0);
+  file_name_copy2 = palloc_get_page(0);
+  if (file_name_copy1 == NULL || file_name_copy2 == NULL)
+    return TID_ERROR;
+
+  // 복사해둠 (하나는 스레드 이름, 하나는 인자로 넘길 전체명)
+  strlcpy(file_name_copy1, file_name, PGSIZE);
+  strlcpy(file_name_copy2, file_name, PGSIZE);
+
+  // strtok_r로 첫 번째 토큰 분리
+  token = strtok_r(file_name_copy1, " ", &save_ptr);
+
+  // token은 "bin/ls"처럼 실제 실행할 파일 이름이 됨
+  tid = thread_create(token, PRI_DEFAULT, start_process, file_name_copy2);
+
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+  {
+    palloc_free_page(file_name_copy2);
+    palloc_free_page(file_name_copy1);
+  }
+  else
+  {
+    // file_name_copy1해제
+    palloc_free_page(file_name_copy1);
+  }
+
   return tid;
+
 }
 
 /* A thread function that loads a user process and starts it
@@ -51,6 +72,18 @@ static void
 start_process (void *file_name_)
 {
   char *file_name = file_name_;
+
+char *argv[128];   // 인자를 담을 배열
+int argc = 0;      // 인자 개수
+char *token, *save_ptr;
+
+// 문자열을 자르면서 argv에 저장
+for (token = strtok_r(file_name, " ", &save_ptr); token != NULL;
+     token = strtok_r(NULL, " ", &save_ptr))
+{
+  argv[argc++] = token;
+}
+
   struct intr_frame if_;
   bool success;
 
@@ -59,12 +92,20 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  //수정
+  success = load (argv[0], &if_.eip, &if_.esp);
 
-  /* If load failed, quit. */
-  palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
+if (success)
+{
+  argument_stack(argv, argc, &if_.esp);
+  hex_dump((uintptr_t)if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
+
+}
+
+palloc_free_page(file_name);
+if (!success)
+  thread_exit();
+
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -75,6 +116,53 @@ start_process (void *file_name_)
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
+
+/*Implement argument_stack()*/
+void
+argument_stack(char **argv, int argc, void **esp)
+{
+  int i;
+  void *arg_ptr[128];  // 각 문자열 주소 저장
+
+  // 문자열을 역순으로 스택에 push
+  for (i = argc - 1; i >= 0; i--) {
+    int len = strlen(argv[i]) + 1;
+    *esp -= len;
+    memcpy(*esp, argv[i], len);
+    arg_ptr[i] = *esp; // 나중에 argv[i]로 접근하기 위해 저장
+  }
+
+  // 워드 정렬 (4의 배수로 맞추기)
+  uintptr_t align = (uintptr_t)(*esp) % 4;
+  if (align) {
+    *esp -= align;
+    memset(*esp, 0, align);
+  }
+
+  // NULL sentinel
+  *esp -= sizeof(char *);
+  *(char **)(*esp) = NULL;
+
+  // 각 문자열의 주소를 역순으로 push
+  for (i = argc - 1; i >= 0; i--) {
+    *esp -= sizeof(char *);
+    memcpy(*esp, &arg_ptr[i], sizeof(char *));
+  }
+
+  // argv 주소 저장
+  char **argv_addr = *esp;
+  *esp -= sizeof(char **);
+  memcpy(*esp, &argv_addr, sizeof(char **));
+
+  // argc 저장
+  *esp -= sizeof(int);
+  memcpy(*esp, &argc, sizeof(int));
+
+  // fake return address
+  *esp -= sizeof(void *);
+  *(void **)(*esp) = NULL;
+}
+
 
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
