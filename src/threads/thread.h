@@ -170,3 +170,4 @@ void update_priority_all(void);
 
 #endif /* threads/thread.h */
 
+typedef int pid_t;
