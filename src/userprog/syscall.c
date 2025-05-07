@@ -5,6 +5,16 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "devices/shutdown.h"
+#include "filesys/filesys.h"
+#include "filesys/file.h"
+#include "threads/synch.h"
+
+#include "threads/palloc.h"
+#include "lib/string.h"
+
+struct lock filesys_lock;
+bool is_init = false;
+
 
 static void syscall_handler (struct intr_frame *);
 
@@ -23,6 +33,10 @@ static void seek (int fd, unsigned position);
 static unsigned tell (int fd);
 static void close (int fd);
 
+static int add_to_file_table (struct file *f);
+static bool remove_from_file_table (int fd);
+static struct file * get_file_by_fd (int fd);
+
 void
 syscall_init (void)
 {
@@ -37,6 +51,12 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
+  if (!is_init)
+    {
+      lock_init (&filesys_lock);
+      // initialize table here
+      is_init = true;
+    }
   switch (SYSNUM(f->esp)) {
     case SYS_HALT:
       halt ();
@@ -127,6 +147,10 @@ bool
 create (const char *file, unsigned initial_size)
 {
   file = user_to_kernel_vaddr (file);
+  lock_acquire (&filesys_lock);
+  bool success = filesys_create (file, initial_size);
+  lock_release (&filesys_lock);
+  return success;
 }
 
 bool
@@ -134,16 +158,34 @@ remove (const char *file)
 {
 
   file = user_to_kernel_vaddr (file);
+  lock_acquire (&filesys_lock);
+  bool success = filesys_remove (file);
+  lock_release (&filesys_lock);
+  return success;
 }
 
-int open (const char *file)
+int open (const char *file_name)
 {
-   file = user_to_kernel_vaddr (file);
+  file_name = user_to_kernel_vaddr (file_name);
+  lock_acquire (&filesys_lock);
+  struct file *file = filesys_open (file_name);
+  int fd;// = add_to_file_table (file);
+  lock_release (&filesys_lock);
+  return fd;
 }
 
 int filesize (int fd)
 {
+  lock_acquire (&filesys_lock);
+  struct file *f = get_file_by_fd (fd);
+  lock_release (&filesys_lock);
 
+  if (f == NULL)
+    return 0; // try -1
+  lock_acquire (&filesys_lock);
+  int size = file_length (f);
+  lock_release (&filesys_lock);
+  return size;
 }
 
 
@@ -151,34 +193,98 @@ int
 read (int fd, void *buffer, unsigned length)
 {
   buffer = user_to_kernel_vaddr (buffer);
-  return length;
+  /* read from stdin (console) */
+  if (fd == 0)
+    {
+      int i;
+      char *cbuffer = buffer;
+      for (i = 0; i < length; i++)
+      	{
+      	  cbuffer[i] = input_getc();
+      	}
+      return length;
+    }
+  
+  /* read from file */
+  lock_acquire (&filesys_lock);
+  struct file *f = get_file_by_fd (fd);
+  if (f == NULL)
+    {
+      lock_release (&filesys_lock);
+      return -1; // try 0
+    }
+  int size = file_read (f, buffer, length);
+  lock_release (&filesys_lock);
+  return size;
 }
 
 int
 write (int fd, const void *buffer, unsigned length)
 {
   buffer = user_to_kernel_vaddr (buffer);
+  /* write to stdout (console) */
   if (fd == 1)
     {
       putbuf (buffer, length);
       return length;
     }
   return -1;
+
+  /* write to file */
+  lock_acquire (&filesys_lock);
+  struct file *f = get_file_by_fd (fd);
+  if (f == NULL)
+    {
+      lock_release (&filesys_lock);
+      return -1; // try 0
+    }
+  int size = file_write (f, buffer, length);
+  lock_release (&filesys_lock);
+  return size;
 }
 
 void seek (int fd, unsigned position)
 {
+  if (position < 0)
+    return;
 
+  lock_acquire (&filesys_lock);
+  struct file *f = get_file_by_fd (fd);
+  if (f == NULL || position < 0)
+    {
+      lock_release (&filesys_lock);
+      return;
+    }
+  file_seek (f, position);
+  lock_release (&filesys_lock);
 }
 
 unsigned tell (int fd)
 {
-
+  lock_acquire (&filesys_lock);
+  struct file *f = get_file_by_fd (fd);
+  if (f == NULL)
+    {
+      lock_release (&filesys_lock);
+      return -1;
+    }
+  int pos = file_tell (f);
+  lock_release (&filesys_lock);
+  return pos;
 }
 
 void close (int fd)
 {
-
+  lock_acquire (&filesys_lock);
+  struct file *f = get_file_by_fd (fd);
+  if (f == NULL)
+    {
+      lock_release (&filesys_lock);
+      return;
+    }
+  remove_from_file_table (fd);
+  file_close (f);
+  lock_release (&filesys_lock);
 }
 
 /* return kernel virtual address pointing to the physical address pointed to by
@@ -195,4 +301,18 @@ user_to_kernel_vaddr (void *uaddr)
   if (kaddr == NULL)
     exit (-1);
   return kaddr;
+}
+
+static struct file *
+get_file_by_fd (int fd)
+{
+  return NULL;
+}
+
+/* remove the file object and fd from file_table
+   returns true if successfully removed and false otherwise */
+static bool
+remove_from_file_table (int fd)
+{
+  return false;
 }
