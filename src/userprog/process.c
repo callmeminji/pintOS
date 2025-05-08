@@ -88,7 +88,7 @@ start_process (void *args_)
   /* copy full file_name_ then tokenize it to get file_name and count argc */
   char *fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
-    return TID_ERROR;
+    thread_exit();
   strlcpy (fn_copy, (char*) file_name_, PGSIZE);
   char *save_ptr;
   file_name = strtok_r (fn_copy, " ", &save_ptr);
@@ -119,6 +119,7 @@ start_process (void *args_)
 
   /* push main function arguments to stack */
   main_stack_setup ((char*) file_name_, argc, &if_.esp);
+  //테스트1 hex_dump((uintptr_t)if_.esp, if_.esp, (size_t)(PHYS_BASE - (uintptr_t)if_.esp), true);
     
     child_elem->loading_status = 0;
     sema_up (args->loading_sema);
@@ -128,6 +129,15 @@ start_process (void *args_)
      arguments on the stack in the form of a `struct intr_frame',
      we just point the stack pointer (%esp) to our stack frame
      and jump to it. */
+
+  // 예시: argv, argc가 있다면 이렇게 쓸 수 있음
+  
+
+
+  // 주소 출력
+  
+
+
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
