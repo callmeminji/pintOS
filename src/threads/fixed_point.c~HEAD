@@ -22,3 +22,4 @@ int fp_mul_int(int x, int n) { return x * n; }
 
 int fp_div(int x, int y) { return ((int64_t)x) * F / y; }
 int fp_div_int(int x, int n) { return x / n; }
+
