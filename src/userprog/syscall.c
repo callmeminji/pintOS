@@ -293,7 +293,8 @@ unsigned tell (int fd)
   return pos;
 }
 
-void close (int fd)
+void
+close (int fd)
 {
   lock_acquire (&filesys_lock);
   struct file *f = get_file_by_fd (fd);
@@ -302,10 +303,15 @@ void close (int fd)
       lock_release (&filesys_lock);
       return;
     }
+
+  // 현재 실행 중인 파일이면 닫지 않음
+  if (f != thread_current()->running_file)
+    file_close (f);
+
   remove_from_file_table (fd);
-  file_close (f);
   lock_release (&filesys_lock);
 }
+
 
 /* return kernel virtual address pointing to the physical address pointed to by
    uaddr, to be used in kernel code.

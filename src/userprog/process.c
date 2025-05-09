@@ -227,23 +227,25 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  /* === 실행 중이던 파일 닫기: rox 관련 테스트 통과용 === */
+  if (cur->running_file != NULL)
+    {
+      file_allow_write(cur->running_file); // 다시 쓰기 가능하게 변경
+      file_close(cur->running_file);       // 파일 닫기
+      cur->running_file = NULL;
+    }
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
   if (pd != NULL)
     {
-      /* Correct ordering here is crucial.  We must set
-         cur->pagedir to NULL before switching page directories,
-         so that a timer interrupt can't switch back to the
-         process page directory.  We must activate the base page
-         directory before destroying the process's page
-         directory, or our active page directory will be one
-         that's been freed (and cleared). */
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
 }
+
 
 /* Sets up the CPU for running user code in the current
    thread.
@@ -437,11 +439,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
+  /* 실행 중인 파일에 대해 write 방지 설정 */
+  t->running_file = file;
+  file_deny_write(file);
+
   success = true;
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  //file_close (file); 실행중인 파일은 닫지 않음
   return success;
 }
 
