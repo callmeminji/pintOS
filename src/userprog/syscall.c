@@ -241,13 +241,13 @@ int
 write (int fd, const void *buffer, unsigned length)
 {
   buffer = user_to_kernel_vaddr (buffer);
+
   /* write to stdout (console) */
   if (fd == 1)
     {
       putbuf (buffer, length);
       return length;
     }
-  return -1;
 
   /* write to file */
   lock_acquire (&filesys_lock);
@@ -255,12 +255,13 @@ write (int fd, const void *buffer, unsigned length)
   if (f == NULL)
     {
       lock_release (&filesys_lock);
-      return -1; // try 0
+      return -1;
     }
   int size = file_write (f, buffer, length);
   lock_release (&filesys_lock);
   return size;
 }
+
 
 void seek (int fd, unsigned position)
 {

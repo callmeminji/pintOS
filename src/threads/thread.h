@@ -186,6 +186,8 @@ void update_load_avg(void);
 void update_recent_cpu_all(void);
 void update_priority_all(void);
 
+typedef int pid_t;
+
 #endif /* threads/thread.h */
 
-typedef int pid_t;
+
